@@ -11,6 +11,12 @@
 #define MFIELD 10
 #define tamanhoCampo 10 //será quando bits o nome da coluna ocupará
 
+
+//Em tamanho Header temos o quanto em Bytes o cabeçalho da tabela ocupou na página. 
+//Assim o tamanho máximo dos slots deve ser 4KB - TamanhoHeader.
+//Ainda não considerando o tamanho do vetor de bitmap.
+int TamanhoHeader = 0;
+
 void buildHeader(){
 	FILE *f;
 	f = fopen("agenda.dat","w+");
@@ -18,7 +24,15 @@ void buildHeader(){
 		printf("File could not be created\n");
 		exit(0);
     }
+    /*
+		TAMANHO - É armazenado o valor que denota o tamanho do campo da coluna.
+		--
+		TIPO - Armazena o valor que denota o tipo do campo da coluna.
+		--
+		CONT - Temos o controle do número de colunas da tabela.
+	 */
 	int tamanho = 0, cont = 0;
+	//opt e c são para controle de LOOP
 	char opt, c, tipo;
 	do{
 		printf("tipo: ");
@@ -39,6 +53,7 @@ void buildHeader(){
 	    fwrite(&tipo,1,1,f);
 	    fwrite(&tamanho,sizeof(int),1,f);
 		printf("Continuar (S/N):");
+		//Número de colunas da tabela
 		cont++;
 		opt = getchar();
 	    while((c = getchar()) != '\n' && c != EOF); /// garbage collector
@@ -46,6 +61,9 @@ void buildHeader(){
 	char fname[tamanhoCampo];
 	strcpy(fname,"#");
     fwrite(fname,tamanhoCampo+1+sizeof(int),MFIELD-cont,f);
+    // o Cont é o número de colunas que o usuário escolheu, logo 
+    // é necessário multiplicar pelo tamanhoCampo, tamanho do tipo e tamanho do campo da coluna. 
+    TamanhoHeader = (1+cont)*(tamanhoCampo+1+sizeof(int));
     fclose(f);
 }
 
