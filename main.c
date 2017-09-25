@@ -148,7 +148,7 @@ void gravarBitMap(){
 void insertSlots(){
 	FILE *f;
 	struct theader *t;
-	int i, slotCounter = 0, nrPag = 1, hlen, slotLivre = 0;
+	int i, nrPag = 1, hlen, slotLivre = 0;
 	char opt, buf[100],c;
 	union tint eint;
 	t = readHeader();
@@ -157,78 +157,44 @@ void insertSlots(){
 		printf("File not found\n");
 		exit(0);
     }
-	slotLivre = procurarPosicaoBitMap();
-	hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + sizeof(int)*2 + slotLivre*tmCampos;
-	// sizeof(int)*2 = 1 é para o inteiro tmCampos e outro para o inteiro tmSlots.
-    fseek(f,hlen,SEEK_SET);
-	if(slotLivre == -1){
-		printf("Cheio, exclua algo.\n");
-	} else {
-		printf("(escrever)Slot nº %d\n",slotLivre);
-		/*do{
-	       	i = 0;
-			if(slotLivre  > slotCounter){
-				slotCounter++;
-				continue;
+	do{
+		slotLivre = procurarPosicaoBitMap();
+		// sizeof(int)*2 = 1 é para o inteiro tmCampos e outro para o inteiro tmSlots.
+		hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + sizeof(int)*2 + slotLivre*tmCampos;
+	    fseek(f,hlen,SEEK_SET);
+		if(slotLivre == -1){
+			printf("Cheio, exclua algo.\n");
+		} else {
+			printf("(escrever)Slot nº %d\n",slotLivre);
+			i = 0;
+			if(t[i].name[0]!='#') {
+				fwrite(&nrPag,sizeof(int),1,f);
+				fwrite(&slotLivre,sizeof(int),1,f);
 			}
-	       	if( slotCounter >=tmSlots){
-	       		printf("O Tamanho máximo de Slots foi atingido.\n");
-	       		break;
-	       	}
-	       	if(t[i].name[0]!='#') {
-	       		fwrite(&nrPag,sizeof(int),1,f);
-	       		fwrite(&slotCounter,sizeof(int),1,f);
-	       	}
-	       	while (i<10 && t[i].name[0]!='#'){
+			while (i<10 && t[i].name[0]!='#'){
 				printf("\n%s: ",t[i].name);
 				setbuf(stdin,NULL);
 				//ver estouro de varivael
 				switch (t[i].type){
 					case 'S': fgets(buf,t[i].len+1,stdin);
-					          if (buf[strlen(buf)-1]!='\n')  c = getchar();
-					          else buf[strlen(buf)-1]=0;
-					          fwrite(buf,t[i].len,1,f);
-					        break;
-					case 'C': buf[0]=fgetc(stdin);
-					          while((c = getchar()) != '\n' && c != EOF); /// garbage collector
-					          fwrite(buf,t[i].len,1,f);
-					        break;
+							  if (buf[strlen(buf)-1]!='\n')  c = getchar();
+							  else buf[strlen(buf)-1]=0;
+							  fwrite(buf,t[i].len,1,f);
+							break;
 					case 'I': scanf("%d",&eint.vint);
-					          while((c = getchar()) != '\n' && c != EOF); /// garbage collector
-					          fwrite (&eint.vint,t[i].len,1,f);
-					        break;
-			    }
-			    i++;
-		    }
-		    printf("Continuar (S/N): "); opt=getchar();
-		    while((c = getchar()) != '\n' && c != EOF); /// garbage collector
-			setarPosicaoBitMap(slotCounter);
-		    slotCounter++;
-		} while (opt=='S' || opt=='s');*/
-		i = 0;
-		if(t[i].name[0]!='#') {
-			fwrite(&nrPag,sizeof(int),1,f);
-			fwrite(&slotLivre,sizeof(int),1,f);
-		}
-		while (i<10 && t[i].name[0]!='#'){
-			printf("\n%s: ",t[i].name);
-			setbuf(stdin,NULL);
-			//ver estouro de varivael
-			switch (t[i].type){
-				case 'S': fgets(buf,t[i].len+1,stdin);
-						  if (buf[strlen(buf)-1]!='\n')  c = getchar();
-						  else buf[strlen(buf)-1]=0;
-						  fwrite(buf,t[i].len,1,f);
-						break;
-				case 'I': scanf("%d",&eint.vint);
-						  while((c = getchar()) != '\n' && c != EOF); /// garbage collector
-						  fwrite (&eint.vint,t[i].len,1,f);
-						break;
+							  while((c = getchar()) != '\n' && c != EOF); /// garbage collector
+							  fwrite (&eint.vint,t[i].len,1,f);
+							break;
+				}
+				i++;
 			}
+			setarPosicaoBitMap(slotLivre);
 		}
-		setarPosicaoBitMap(slotLivre);
-		gravarBitMap();
-	}
+		printf("Continuar (S/N): ");
+		opt = getchar();
+	    while((c = getchar()) != '\n' && c != EOF); /// garbage collector
+	}while(opt=='S' || opt=='s');
+	gravarBitMap();
 	fclose(f);
 }
 
@@ -247,6 +213,11 @@ void selectAll(){
 	int slot = 0, cont = 0;
 	printf("nº do slot: ");
 	scanf("%d", &slot); //12345 - é o comando para imprimir todos.
+	if(slot == 12345)
+		hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + sizeof(int)*2;
+	else
+		hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + sizeof(int)*2 + slot*tmCampos;
+	printf("slot: %d -- tmCampos: %d -- hlen: %d -- cabeçario: %d\n", slot, tmCampos, hlen, MFIELD*(TAMANHOCAMPO+1+sizeof(int)));
 	printf("P S ");
     while (i<10 && t[i].name[0]!='#'){
         printf("%s ",t[i].name);
@@ -256,16 +227,15 @@ void selectAll(){
         i++;
     }
 	printf("\n");
-    hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + sizeof(int)*2;
     fseek(f,hlen,SEEK_SET);
     do{
 		i = 0;
-		if(t[i].name[0]!='#' && i<10){
-			fread(&nrPag,sizeof(int),1,f);
-			fread(&nrSlot,sizeof(int),1,f);
-			printf("%d %d ",nrPag,nrSlot);
-		}
 		while (i<10 && t[i].name[0]!='#'){
+			if((cont == slot || slot == 12345) && i == 0){
+				fread(&nrPag,sizeof(int),1,f);
+				fread(&nrSlot,sizeof(int),1,f);
+				printf("%d %d ",nrPag,nrSlot);
+			}
   			if (!fread(buf,t[i].len,1,f))
 				break;
 			if(cont == slot || slot == 12345)
@@ -285,7 +255,6 @@ void selectAll(){
 		    i++;
 	    }
 		if(cont == slot || slot == 12345) printf("\n");
-		printf("\n");
 		cont++;
     }while(!feof(f));
     fclose(f);
