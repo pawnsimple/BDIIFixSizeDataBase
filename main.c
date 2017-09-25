@@ -57,10 +57,18 @@ void buildHeader(){
     fwrite(fname,TAMANHOCAMPO+1+sizeof(int),MFIELD-cont,f);
     // o Cont é o número de colunas que o usuário escolheu, logo
     // é necessário multiplicar pelo TAMANHOCAMPO, tamanho do tipo e tamanho do campo da coluna.
-    TamanhoHeader = (1+cont)*(TAMANHOCAMPO+1+sizeof(int) + 2) + sizeof(int); // +2 é por causa do colchetes
-	tmSlots = (4096 - TamanhoHeader) / (tmCampos+8); // +8 dos indexes do slot, dois inteiros um para a pag. e outro o nº do slot.
-    tmSlots = (4096 - TamanhoHeader - tmSlots) / (tmCampos+8); // recalculado para discontar o espaço ocupado pelo bitMap.
-	fwrite(&tmSlots,sizeof(int),1,f); // gravar o numero de slots, pois quando só for feita a leitura do arquivo tem q saber, quandos slots tem a pagina.
+    //Esse sizeof(int) a mais é para o tamanho da header
+    TamanhoHeader = ((1+cont)*(TAMANHOCAMPO+1+sizeof(int))) + 2 + sizeof(int)+sizeof(int); 
+    // +2 é por causa do colchetes
+    
+	tmSlots = (4096 - TamanhoHeader) / (tmCampos+8); 
+	// +8 dos indexes do slot, dois inteiros um para a pag. e outro o nº do slot.
+    tmSlots = (4096 - TamanhoHeader - tmSlots) / (tmCampos+8); 
+    // recalculado para discontar o espaço ocupado pelo bitMap.
+    fwrite(&TamanhoHeader,sizeof(int),1,f);
+	fwrite(&tmSlots,sizeof(int),1,f); 
+	// gravar o numero de slots, pois quando só for feita a leitura do arquivo 
+	//tem q saber, quandos slots tem a pagina.
 	char t = '[';
     fwrite(&t,1,1,f);
     t = '0';
@@ -96,7 +104,7 @@ struct theader *readHeader(){
 		fread(&th[i].type,1,1,f);
 		fread(&th[i].len,sizeof(int),1,f);
 	}
-	int hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + 2 + sizeof(int);
+	int hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int))+ sizeof(int)+sizeof(int)+1;
     fseek(f,hlen,SEEK_SET);
 	bitMap = (char *) malloc (tmSlots* sizeof(int)); // alocação do vetor de bitMap
     for (i = 0; i < tmSlots; i++)
@@ -104,7 +112,117 @@ struct theader *readHeader(){
 	fclose(f);
 	return th;
 }
+int procurarPosicaoBitMap () {
+	int i;
+	for(i = 0; i < tmSlots; i++) {
+		  if(bitMap[i] == '0'){ 
+				return i;
+			}
+	}
+	return -1;
+	//printf("%d - %c -",i,bitMap[i]);
+	//printf("\n");
+}
 
+void setarPosicaoBitMap(int vlr) {
+	int i;
+	for(i = 0; i < tmSlots; i++) 
+		if(i == vlr){
+			bitMap[i] = '1';
+		}
+}
+
+void gravarBitMap() {
+	 FILE *f;
+	int i;
+	char t;
+	f = fopen("agenda.dat","r+");
+	if (f==NULL){
+		printf("File not found\n");
+		exit(0);
+    }
+    int hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int))+ sizeof(int)+sizeof(int)+1;
+    fseek(f,hlen,SEEK_SET);
+	for(i = 0; i < tmSlots;i++) {
+		fwrite(&bitMap[i],1,1,f);
+	}
+	fclose(f);
+}
+
+void insertSlots() {
+	 FILE *f;
+	struct theader *t;
+	int i,slotCounter,nrPag = 1,hlen,slotLivre = 0;
+	char opt, buf[100],c;
+	union tint eint;
+	t = readHeader();
+	f = fopen("agenda.dat","r+");
+	if (f==NULL){
+		printf("File not found\n");
+		exit(0);
+    }
+	hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int));
+	fseek(f,hlen,SEEK_SET);
+	fread(&TamanhoHeader,sizeof(int),1,f);
+	fread(&tmSlots,sizeof(int),1,f);
+	//printf("%d %d\n",TamanhoHeader,tmSlots );
+	hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + 2 + sizeof(int)+sizeof(int);
+    fseek(f,hlen,SEEK_SET);
+    
+    
+    slotCounter= 0;
+       do {
+       	slotLivre = procurarPosicaoBitMap();
+       	if(slotLivre == -1){
+       		printf("Cheio, exclua algo.\n"); 
+       		break;
+       	} 
+       	printf("%d livre e\n",slotLivre);
+       	i=0;
+       	  if(slotLivre  > slotCounter){
+       	  	slotCounter++;
+       	  	continue;
+       	  }
+
+       	if( slotCounter >=tmSlots){
+       		printf("O Tamanho máximo de Slots foi atingido.\n");
+       		break;
+       	}
+       	if(t[i].name[0]!='#') {
+       		fwrite(&nrPag,sizeof(int),1,f);
+       		fwrite(&slotCounter,sizeof(int),1,f);
+       	}
+       	while (i<10 && t[i].name[0]!='#'){
+			printf("\n%s: ",t[i].name);
+			setbuf(stdin,NULL);
+			//ver estouro de varivael
+			switch (t[i].type){
+				case 'S': fgets(buf,t[i].len+1,stdin);
+				          if (buf[strlen(buf)-1]!='\n')  c = getchar();
+				          else buf[strlen(buf)-1]=0;
+				          fwrite(buf,t[i].len,1,f);
+				        break;
+				case 'C': buf[0]=fgetc(stdin);
+				          while((c = getchar()) != '\n' && c != EOF); /// garbage collector
+				          fwrite(buf,t[i].len,1,f);
+				        break;
+				case 'I': scanf("%d",&eint.vint);
+				          while((c = getchar()) != '\n' && c != EOF); /// garbage collector
+				          fwrite (&eint.vint,t[i].len,1,f);
+				        break;
+		    }
+		    i++;
+	    }
+	    printf("Continuar (S/N): "); opt=getchar();
+	    while((c = getchar()) != '\n' && c != EOF); /// garbage collector
+		setarPosicaoBitMap(slotCounter);
+	    slotCounter++;
+	} while (opt=='S' || opt=='s');
+	gravarBitMap(); 
+	fclose(f);
+}
+
+/*
 void insert(){
     FILE *f;
 	struct theader *t;
@@ -145,11 +263,12 @@ void insert(){
 	} while (opt=='S' || opt=='s');
 	fclose(f);
 }
+*/
 
 void selectAll(){
     FILE *f;
 	struct theader *t;
-	int hlen,i = 0,j,space;
+	int hlen,nrPag = 0,nrSlot = 0,i = 0,j,space;
 	char buf[100];
 	union tint eint;
 	t = readHeader();
@@ -166,13 +285,21 @@ void selectAll(){
         i++;
     }
 	hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int));
-	int nSlots;
-	fread(&nSlots,sizeof(int),1,f);
-	printf("\n -- hlen: %d -- %d -- \n", hlen, nSlots);
-    hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + 2 + sizeof(int);
+	fseek(f,hlen,SEEK_SET);
+	
+	fread(&TamanhoHeader,sizeof(int),1,f);
+	fread(&tmSlots,sizeof(int),1,f);
+	//printf("%d %d\n",TamanhoHeader,tmSlots );
+	hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + 2 + sizeof(int)+sizeof(int);
     fseek(f,hlen,SEEK_SET);
+     printf("\n");
     do{
 		i=0;
+		if(t[i].name[0]!='#' && i<10) {
+			fread(&nrPag,sizeof(int),1,f);
+			fread(&nrSlot,sizeof(int),1,f);
+			printf("%d %d",nrPag,nrSlot);
+		}
 		while (i<10 && t[i].name[0]!='#'){
   			if (!fread(buf,t[i].len,1,f)) break;
 			switch (t[i].type){
@@ -196,7 +323,7 @@ void selectAll(){
 
 int main(){
 	// buildHeader();
-	// insert();
+	insertSlots();
     selectAll();
 	// int i;
 	// for (i = 0; i < tmSlots; ++i)
