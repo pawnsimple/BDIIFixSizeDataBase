@@ -8,7 +8,7 @@
 //Em tamanho Header temos o quanto em Bytes o cabeçalho da tabela ocupou na página.
 //Assim o tamanho máximo dos slots deve ser 4KB - TamanhoHeader.
 //Ainda não considerando o tamanho do vetor de bitmap.
-int TamanhoHeader = 0,tmSlots = 0,tmCampos = 0;
+int TamanhoHeader = 0,numeroSlots = 0,tmCampos = 0;
 char *bitMap;
 
 void buildHeader(){
@@ -62,15 +62,15 @@ void buildHeader(){
     TamanhoHeader = ((1+cont)*(TAMANHOCAMPO+1+sizeof(int))) + sizeof(int);
 	tmCampos += 8;
 	fwrite(&tmCampos,sizeof(int),1,f);
-	tmSlots = (4096 - TamanhoHeader) / (tmCampos);
+	numeroSlots = (4096 - TamanhoHeader) / (tmCampos);
 	// +8 dos indexes do slot, dois inteiros um para a pag. e outro o nº do slot.
-    tmSlots = (4096 - TamanhoHeader - tmSlots) / (tmCampos);
+    numeroSlots = (4096 - TamanhoHeader - numeroSlots) / (tmCampos);
     // recalculado para discontar o espaço ocupado pelo bitMap.
-	fwrite(&tmSlots,sizeof(int),1,f);
+	fwrite(&numeroSlots,sizeof(int),1,f);
 	// gravar o numero de slots, pois quando só for feita a leitura do arquivo
 	//tem q saber, quandos slots tem a pagina.
     char t = '0';
-    for(cont = 0; cont < tmSlots; cont++)
+    for(cont = 0; cont < numeroSlots; cont++)
     	fwrite(&t,1,1,f);
     fclose(f);
 }
@@ -101,22 +101,22 @@ struct theader *readHeader(){
 		fread(&th[i].len,sizeof(int),1,f);
 	}
 	fread(&tmCampos,sizeof(int),1,f);
-	fread(&tmSlots,sizeof(int),1,f);
-	printf("nº slots: %d, tamanho campo: %d\n", tmSlots, tmCampos);
-	bitMap = (char *) malloc (tmSlots* sizeof(int)); // alocação do vetor de bitMap
-    for (i = 0; i < tmSlots; i++)
+	fread(&numeroSlots,sizeof(int),1,f);
+	// printf("nº slots: %d, tamanho campo: %d\n", numeroSlots, tmCampos);
+	bitMap = (char *) malloc (numeroSlots* sizeof(int)); // alocação do vetor de bitMap
+    for (i = 0; i < numeroSlots; i++)
     	fread(&bitMap[i],1,1,f);
 	fclose(f);
-	printf("bitMap: ");
-	for (i = 0; i < tmSlots; i++)
-		printf("%c - ", bitMap[i]);
-	printf("\n");
+	// printf("bitMap: ");
+	// for (i = 0; i < numeroSlots; i++)
+		// printf("%c - ", bitMap[i]);
+	// printf("\n");
 	return th;
 }
 
 int procurarPosicaoBitMap (){
 	int i;
-	for(i = 0; i < tmSlots; i++)
+	for(i = 0; i < numeroSlots; i++)
 		  if(bitMap[i] == '0')
 				return i;
 	return -1;
@@ -124,7 +124,7 @@ int procurarPosicaoBitMap (){
 
 void setarPosicaoBitMap(int vlr){
 	int i;
-	for(i = 0; i < tmSlots; i++)
+	for(i = 0; i < numeroSlots; i++)
 		if(i == vlr)
 			bitMap[i] = '1';
 }
@@ -140,7 +140,7 @@ void gravarBitMap(){
     }
     int hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + sizeof(int)*2;
     fseek(f,hlen,SEEK_SET);
-	for(i = 0; i < tmSlots;i++)
+	for(i = 0; i < numeroSlots;i++)
 		fwrite(&bitMap[i],1,1,f);
 	fclose(f);
 }
@@ -159,8 +159,8 @@ void insertSlots(){
     }
 	do{
 		slotLivre = procurarPosicaoBitMap();
-		// sizeof(int)*2 = 1 é para o inteiro tmCampos e outro para o inteiro tmSlots.
-		hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + sizeof(int)*2 + slotLivre*tmCampos;
+		// sizeof(int)*2 = 1 é para o inteiro tmCampos e outro para o inteiro numeroSlots.
+		hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + numeroSlots + sizeof(int)*2 + slotLivre*tmCampos;
 	    fseek(f,hlen,SEEK_SET);
 		if(slotLivre == -1){
 			printf("Cheio, exclua algo.\n");
@@ -202,10 +202,10 @@ void selectAll(){
     FILE *f;
 	struct theader *t;
 	int hlen, nrPag = 0, nrSlot = 0, i = 0, j, space;
-	char buf[100];
 	union tint eint;
 	t = readHeader();
 	f = fopen("agenda.dat","r");
+	char buf[tmCampos];
 	if (f==NULL){
 		printf("File not found\n");
 		exit(0);
@@ -213,11 +213,7 @@ void selectAll(){
 	int slot = 0, cont = 0;
 	printf("nº do slot: ");
 	scanf("%d", &slot); //12345 - é o comando para imprimir todos.
-	if(slot == 12345)
-		hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + sizeof(int)*2;
-	else
-		hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + tmSlots + sizeof(int)*2 + slot*tmCampos;
-	printf("slot: %d -- tmCampos: %d -- hlen: %d -- cabeçario: %d\n", slot, tmCampos, hlen, MFIELD*(TAMANHOCAMPO+1+sizeof(int)));
+	hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + numeroSlots + sizeof(int)*2;
 	printf("P S ");
     while (i<10 && t[i].name[0]!='#'){
         printf("%s ",t[i].name);
@@ -228,13 +224,15 @@ void selectAll(){
     }
 	printf("\n");
     fseek(f,hlen,SEEK_SET);
+	// printf("\n\n\n ---- Slots: %d\n --- Tamanho Slot: %d\n", numeroSlots, tmCampos);
     do{
 		i = 0;
 		while (i<10 && t[i].name[0]!='#'){
-			if((cont == slot || slot == 12345) && i == 0){
+			if(i == 0){
 				fread(&nrPag,sizeof(int),1,f);
 				fread(&nrSlot,sizeof(int),1,f);
-				printf("%d %d ",nrPag,nrSlot);
+				if(cont == slot || slot == 12345)
+					printf("%d %d ",nrPag,nrSlot);
 			}
   			if (!fread(buf,t[i].len,1,f))
 				break;
@@ -245,8 +243,6 @@ void selectAll(){
 				              space=t[i].len-j;
 	                          for (j=0;j<=space;j++)
 	                              printf(" ");
-					        break;
-					case 'C': printf("%c ",buf[0]);
 					        break;
 					case 'I': for (j=0;j< t[i].len;j++) eint.cint[j]=buf[j];
 					          printf("%d ",eint.vint);
@@ -261,7 +257,7 @@ void selectAll(){
 }
 
 int main(){
-	// buildHeader();
+	// buildHeader()/;
 	// insertSlots();
     selectAll();
 	free(bitMap);
