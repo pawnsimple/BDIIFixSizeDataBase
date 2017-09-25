@@ -122,11 +122,11 @@ int procurarPosicaoBitMap (){
 	return -1;
 }
 
-void setarPosicaoBitMap(int vlr){
+void setarPosicaoBitMap(int position, char valor){
 	int i;
 	for(i = 0; i < numeroSlots; i++)
-		if(i == vlr)
-			bitMap[i] = '1';
+		if(i == position)
+			bitMap[i] = valor;
 }
 
 void gravarBitMap(){
@@ -147,53 +147,88 @@ void gravarBitMap(){
 
 void insertSlots(){
 	FILE *f;
-	struct theader *t;
-	int i, nrPag = 1, hlen, slotLivre = 0;
-	char opt, buf[100],c;
-	union tint eint;
-	t = readHeader();
 	f = fopen("agenda.dat","r+");
+	struct theader *t;
+	t = readHeader();
+	int i, nrPag = 1, hlen, slotLivre = 0;
+	char conteudoSlot[tmCampos-8], c;
+	union tint eint;
 	if (f==NULL){
 		printf("File not found\n");
 		exit(0);
     }
-	do{
-		slotLivre = procurarPosicaoBitMap();
-		// sizeof(int)*2 = 1 é para o inteiro tmCampos e outro para o inteiro numeroSlots.
-		hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + numeroSlots + sizeof(int)*2 + slotLivre*tmCampos;
-	    fseek(f,hlen,SEEK_SET);
-		if(slotLivre == -1){
-			printf("Cheio, exclua algo.\n");
-		} else {
-			printf("(escrever)Slot nº %d\n",slotLivre);
-			i = 0;
-			if(t[i].name[0]!='#') {
-				fwrite(&nrPag,sizeof(int),1,f);
-				fwrite(&slotLivre,sizeof(int),1,f);
-			}
-			while (i<10 && t[i].name[0]!='#'){
-				printf("\n%s: ",t[i].name);
-				setbuf(stdin,NULL);
-				//ver estouro de varivael
-				switch (t[i].type){
-					case 'S': fgets(buf,t[i].len+1,stdin);
-							  if (buf[strlen(buf)-1]!='\n')  c = getchar();
-							  else buf[strlen(buf)-1]=0;
-							  fwrite(buf,t[i].len,1,f);
-							break;
-					case 'I': scanf("%d",&eint.vint);
-							  while((c = getchar()) != '\n' && c != EOF); /// garbage collector
-							  fwrite (&eint.vint,t[i].len,1,f);
-							break;
-				}
-				i++;
-			}
-			setarPosicaoBitMap(slotLivre);
+	slotLivre = procurarPosicaoBitMap();
+	// sizeof(int)*2 = 1 é para o inteiro tmCampos e outro para o inteiro numeroSlots.
+	hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + numeroSlots + sizeof(int)*2 + slotLivre*tmCampos;
+    fseek(f,hlen,SEEK_SET);
+	if(slotLivre == -1){
+		printf("Cheio, exclua algo.\n");
+	} else {
+		printf("(escrever)Slot nº %d\n",slotLivre);
+		i = 0;
+		if(t[i].name[0]!='#') {
+			fwrite(&nrPag,sizeof(int),1,f);
+			fwrite(&slotLivre,sizeof(int),1,f);
 		}
-		printf("Continuar (S/N): ");
-		opt = getchar();
-	    while((c = getchar()) != '\n' && c != EOF); /// garbage collector
-	}while(opt=='S' || opt=='s');
+		while (i<10 && t[i].name[0]!='#'){
+			printf("\n%s: ",t[i].name);
+			setbuf(stdin,NULL);
+			//ver estouro de varivael
+			switch (t[i].type){
+				case 'S': fgets(conteudoSlot,t[i].len+1,stdin);
+						  if (conteudoSlot[strlen(conteudoSlot)-1]!='\n')  c = getchar();
+						  else conteudoSlot[strlen(conteudoSlot)-1]=0;
+						  fwrite(conteudoSlot,t[i].len,1,f);
+						break;
+				case 'I': scanf("%d",&eint.vint);
+						  while((c = getchar()) != '\n' && c != EOF); /// garbage collector
+						  fwrite (&eint.vint,t[i].len,1,f);
+						break;
+			}
+			i++;
+		}
+		setarPosicaoBitMap(slotLivre, '1');
+	}
+	gravarBitMap();
+	fclose(f);
+}
+
+void removeSlots(){
+	FILE *f;
+	f = fopen("agenda.dat","r+");
+	struct theader *t;
+	t = readHeader();
+	int hlen, slot, i, w, zero = 0;
+	char limpa = ' ';
+	union tint eint;
+	if (f==NULL){
+		printf("File not found\n");
+		exit(0);
+	}
+	printf("nº do slot: ");
+	scanf("%d", &slot);
+	if(slot > numeroSlots){
+		printf("slot invalido!");
+	} else {
+		// char conteudo[tmCampos-8];
+		hlen = MFIELD*(TAMANHOCAMPO+1+sizeof(int)) + numeroSlots + sizeof(int)*2 + slot*tmCampos + 8;
+		fseek(f,hlen,SEEK_SET);
+		w = i = 0;
+		while (i<10 && t[i].name[0]!='#'){
+			switch (t[i].type){
+				case 'S':
+						for(w = 0; w < t[i].len; w++){
+							fwrite(&limpa,1,1,f);
+						}
+						break;
+				case 'I':
+						fwrite(&zero,t[i].len,1,f);
+						break;
+			}
+			i++;
+		}
+		setarPosicaoBitMap(slot, '0');
+	}
 	gravarBitMap();
 	fclose(f);
 }
@@ -205,7 +240,7 @@ void selectAll(){
 	union tint eint;
 	t = readHeader();
 	f = fopen("agenda.dat","r");
-	char buf[tmCampos];
+	char conteudoSlot[tmCampos-8];
 	if (f==NULL){
 		printf("File not found\n");
 		exit(0);
@@ -225,7 +260,7 @@ void selectAll(){
 	printf("\n");
     fseek(f,hlen,SEEK_SET);
 	// printf("\n\n\n ---- Slots: %d\n --- Tamanho Slot: %d\n", numeroSlots, tmCampos);
-    do{
+    while(!feof(f)){
 		i = 0;
 		while (i<10 && t[i].name[0]!='#'){
 			if(i == 0){
@@ -234,17 +269,17 @@ void selectAll(){
 				if(cont == slot || slot == 12345)
 					printf("%d %d ",nrPag,nrSlot);
 			}
-  			if (!fread(buf,t[i].len,1,f))
+  			if (!fread(conteudoSlot,t[i].len,1,f))
 				break;
 			if(cont == slot || slot == 12345)
 				switch (t[i].type){
-				    case 'S': for (j=0;j<t[i].len && buf[j]!=0;j++)
-				                 printf("%c",buf[j]);
+				    case 'S': for (j=0;j<t[i].len && conteudoSlot[j]!=0;j++)
+				                 printf("%c",conteudoSlot[j]);
 				              space=t[i].len-j;
 	                          for (j=0;j<=space;j++)
 	                              printf(" ");
 					        break;
-					case 'I': for (j=0;j< t[i].len;j++) eint.cint[j]=buf[j];
+					case 'I': for (j=0;j< t[i].len;j++) eint.cint[j]=conteudoSlot[j];
 					          printf("%d ",eint.vint);
 					        break;
 			    }
@@ -252,14 +287,27 @@ void selectAll(){
 	    }
 		if(cont == slot || slot == 12345) printf("\n");
 		cont++;
-    }while(!feof(f));
+    }
     fclose(f);
 }
 
 int main(){
-	// buildHeader()/;
-	// insertSlots();
-    selectAll();
+	int opt;
+	do{
+		printf("0 - Nova Estrutura\n1 - Insert\n2-  Select\n3 - Remove\n** OUTRO VALOR P/ SAIR! **\nopt: ");
+		scanf("%d", &opt);
+		if(opt == 0)
+			buildHeader();
+		else if(opt == 1)
+			insertSlots();
+	    else if(opt == 2)
+			selectAll();
+		else if(opt == 3)
+			removeSlots();
+		else
+			break;
+		printf("\n\n\n---------------------\n");
+	}while(1);
 	free(bitMap);
 	return 0;
 }
