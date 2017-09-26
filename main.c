@@ -207,7 +207,7 @@ void removeSlots(){
 	}
 	printf("nº do slot: ");
 	scanf("%d", &slot);
-	if(slot > numeroSlots){
+	if(slot > numeroSlots || bitMap[slot] == '0'){
 		printf("slot invalido!");
 	} else {
 		// char conteudo[tmCampos-8];
@@ -217,9 +217,8 @@ void removeSlots(){
 		while (i<10 && t[i].name[0]!='#'){
 			switch (t[i].type){
 				case 'S':
-						for(w = 0; w < t[i].len; w++){
+						for(w = 0; w < t[i].len; w++)
 							fwrite(&limpa,1,1,f);
-						}
 						break;
 				case 'I':
 						fwrite(&zero,t[i].len,1,f);
@@ -292,10 +291,12 @@ void selectAll(){
 }
 
 int main(){
-	int opt;
+	int opt, i;
 	do{
-		printf("0 - Nova Estrutura\n1 - Insert\n2-  Select\n3 - Remove\n** OUTRO VALOR P/ SAIR! **\nopt: ");
+		printf("0 - Nova Estrutura\n1 - Insert\n2-  Select\n3 - Remove\n4 - Ver bitMap\n** OUTRO VALOR P/ SAIR! **\nopt: ");
 		scanf("%d", &opt);
+		printf("\n---------------------\n");
+		setbuf(stdin,NULL);
 		if(opt == 0)
 			buildHeader();
 		else if(opt == 1)
@@ -304,9 +305,13 @@ int main(){
 			selectAll();
 		else if(opt == 3)
 			removeSlots();
-		else
+		else if(opt == 4){
+			printf("bitMaP:\n");
+			for(i = 0; i < numeroSlots; i++)
+				printf("%d - [%c]\n", i, bitMap[i]);
+		}else
 			break;
-		printf("\n\n\n---------------------\n");
+		printf("\n---------------------\n");
 	}while(1);
 	free(bitMap);
 	return 0;
